@@ -10,7 +10,7 @@ This assignment should be completed individually. You are welcome to ask for hel
 
 
 ### Objectives
-By completing this challenge you will practice and master the following skills:
+By completing this assignment you will practice and master the following skills:
 * Accessing location sensors (e.g., GPS) found on mobile devices
 * Integrating Google Play Services and displaying interactive maps
 * Handling run-time permission requests
@@ -135,24 +135,44 @@ When the user chooses to **save** the drawing (such as by selecting an option fr
 
   - You can test your outputted String by pasting it into [this linter](http://geojsonlint.com/) or [this interactive drawer](http://geojson.io/#map=2/20.0/0.0).
 
-You will then need to write this String to a file saved on [External Storage](http://developer.android.com/guide/topics/data/data-storage.html#filesExternal). While this will make the files publicly accessible, it also means you'll be able to share them later! (Bonus points if you can manage to share files from Internal Storage; it wasn't simple enough for me to test and explain here; I will update if I find a solution).
+You will then need to write this String to a file saved on [Internal Storage](http://developer.android.com/guide/topics/data/data-storage.html#filesInternal). Internally stored files are private to your application. You can get access to the internal storage directory with `.getFilesDir()`. You can use the method `openFileOutput()` to open a file for editing... **however**, in order effectively share the file, you're going to want to save it in a **subdirectory** (called e.g., `maps/`). You will need to create this directory first if it doesn't exist. Luckily, the [`File`](http://developer.android.com/reference/java/io/File.html) and [`FileOutputStream`](http://developer.android.com/reference/java/io/FileOutputStream.html) classes make this a fairly painless process:
+```java
+//create maps file if doesn't exist
+File mapsDir = new File(this.getFilesDir(), "maps");
+mapsDir.mkdir();  //turn it into a directory
 
-  - You will need to request permission to write to external storage.
+//create a new file called "drawing.geojson" (overriting previous) and get an output stream for it
+FileOutputStream outputStream = new FileOutputStream(new File(mapsDir, "drawing.geojson"));
 
-  - You should either save the file in a <a href="http://developer.android.com/reference/android/os/Environment.html#getExternalStoragePublicDirectory(java.lang.String)">public directory</a> (maybe Downloads? There isn't really a good choice for this kind of data...) or in a folder called `Geopaint`.
+outputStream.write(string.getBytes()); //write the string to the file
+outputStream.close(); //close the stream
+```
 
-  - Save your file with the `.geojson` extension. Technical it should be a `.json` file, but by being more specific you'll be prepared for your application to be able to _open_ these files later if you wanted.
-
-
-<!-- You will then need to write this String to a file saved on [Internal Storage](http://developer.android.com/guide/topics/data/data-storage.html#filesInternal). Internally stored files are private to your application. You can get access to the internal storage directory with `.getFilesDir()`, or simply open a file to edit using `openFileOutput()`. The later gives you a `FileOutputStream` that you can `.write()` to, thereby saving your JSON String to the file.-->
-
+Be sure and save your file with the `.geojson` extension. Technical it should be a `.json` file, but by being more specific you'll be prepared for your application to be able to _open_ these files later if you wanted.
 
 #### Sharing the Drawing
 You should enable the user to share your drawing (the file!) through an [Action Provider](http://developer.android.com/training/appbar/action-views.html#action-provider). This is a handy widget that produces a "Share" menu button, that will allow some data to be shared with any app that supports it. See the [reference](http://developer.android.com/reference/android/support/v7/widget/ShareActionProvider.html) for more details (be careful not to mix up the support and non-support versions!)
 
-- You will need to craft an `Intent` to share the drawing through. This should use `ACTION_SEND`, a type of `text/plain`, and should include the file `Uri` as an `EXTRA` (you can determine the `Uri` by using the `Uri.fromFile()` method).
+- You will need to craft an `Intent` to share the drawing through. This should use `ACTION_SEND`, a type of `text/plain`, and should include the file `Uri` as an `EXTRA` (specifically, an `EXTRA_STREAM`), but you'll need o do some work to get access to the internal file!
 
-- The goal is to be able to have your app allow for easy emailing of the file! You may need to play around with this a bit to make it work... Worse case you can just attach the JSON String as the body of the email
+Files stored in Internal Storage normally are unavailable to other applications. So even if you send the `Uri` along with an Intent, when the other application (e.g., your email program) gets that Intent it won't be able to open the file because it doesn't have access! In order to get around this, you need to set up a [`FileProvider`](http://developer.android.com/training/secure-file-sharing/setup-sharing.html) in order to explicitly offer access to the file. This is a `ContentProvider` (similar to what you used to query the list of SMS messages for the Messaging App), and it will do the work of finding and serving the otherwise private file to external applications.
+
+Setting up a `FileProvider` is luckily not too complex, though it has a couple of steps. You will need to declare the `<provider>` inside you Manifest (see the [guide link](http://developer.android.com/training/secure-file-sharing/setup-sharing.html) for an example). The attributes you will need to specify are:
+- `android:authority` should be your package name followed by `.fileprovider` (e.g., `edu.uw.myapp.fileprovider`). This says what source/domain is granting permission for others to use the file.
+- The child `<meta-data>` tag includes an `androd:resource` attribute that should point to an XML resource, of type `xml` (the same as used for your SharedPreferences). _You will need to create this file!_ The contents of this file will be a list of what _subdirectories_ you want the `FileProvider` to be able to provide. It will look something like:
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <files-path name="my_maps" path="maps/" />
+</paths>
+```
+The `<files-path>` entry refers to a subdirectory inside the Internal Storage files (the same place that `.getFilesDir()` points to), with the `path` specifying the name of the subdirectory (see why we made one called `maps/`?)
+
+Once you have the provider specified, you can use it to get a `Uri` to the "shared" version of the file using:
+```java
+Uri fileUri = FileProvider.getUriForFile(context, "edu.uw.myapp.fileprovider", fileToShare);
+```
+(note that the second parameter is the "authority" you specified in your `<provider>` in the Manifest). You can then use this `Uri` as the `EXTRA_STREAM` extra in the Intent that you want to share through your `SharedActionProvider` (whew!)
 
 
 #### Loading a Drawing (extra credit!)
