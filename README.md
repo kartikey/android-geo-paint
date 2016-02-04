@@ -47,7 +47,7 @@ You will need to add the **Google Play Services** package to your application as
 
 - You'll also need to modify your `build.gradle` file so that you can get access to the Location classes. In the ___module-level___ `build.gradle` file, under `dependencies` add
   ```
-  compile 'com.google.android.gms:play-services-location:8.4.0'`
+  compile 'com.google.android.gms:play-services-location:8.4.0'
   ```
   This will load in the location services (but not the other services, which require keys)
 
@@ -84,7 +84,7 @@ To show a drawing on the map, you'll need to draw a [Shape](https://developers.g
 
 In particular, you'll be interested in drawing [Polylines](https://developers.google.com/maps/documentation/android-api/shapes#polylines), which are multi-segment lines. The basic algorithm to use is that every time the user moves (so you get a new location update), add that spot to the multi-line, effectively creating a new short line to the current location from the previous one, thus tracing movements!
 
-- Because `Polylines` are drawn once defined, in order to "add" a point you'll need to <a href="https://developers.google.com/android/reference/com/google/android/gms/maps/model/Polyline.html#getPoints()">get</a> a list of all the points in the line, add your new point(s) to that, and then <a href="https://developers.google.com/android/reference/com/google/android/gms/maps/model/Polyline.html#setPoints(java.util.List<com.google.android.gms.maps.model.LatLng>)">set</a> the updated list as the Polyline's points.
+  - Because `Polylines` are drawn once defined, in order to "add" a point you'll need to <a href="https://developers.google.com/android/reference/com/google/android/gms/maps/model/Polyline.html#getPoints()">get</a> a list of all the points in the line, add your new point(s) to that, and then `set` the updated list as the Polyline's points.
 
 The drawing doesn't need to be a single, continuous line: the user is able to either "raise" or "lower" the virtual pen on the map. If the pen is _up_, then no drawing should occur. If the pen is _down_, then you add more points to the `Polyline`.
 
@@ -93,11 +93,14 @@ The drawing doesn't need to be a single, continuous line: the user is able to ei
 - If the user selects to raise the pen again, you should "end" the current `Polyline`. This isn't an explicit step, but it means that when the the user puts the pen down again, they'll be drawing a new line!
 - If the user changes the color of the line (see below), you should end the current Polyline and immediately create another starting at the current location (but with the new color). That is, the pen should stay either "up" or "down" on a color change.
 
+
 **Important:** Normally, map drawings and state (e.g., the location currently shown) will **reset** every time the Activity is re-created... and Activities get re-created a lot (like from rotating the phone). The _easiest_ workaround for this is to specify that the MapFragment should be <a href="http://developer.android.com/reference/android/app/Fragment.html#setRetainInstance(boolean)">retained</a> across activity re-creation. This will let you be able to save the current fragment's appearance, including the drawing, across configuration changes or some app switches.
+
 
 Note that this is only a work-around; if the Activity gets destroyed (either at user request or because of low memory), the drawing will still be lost if it hasn't been explicitly persisted. The _ideal_ solution is probably to save each Polyline and its points in an `SQLiteDatabase`, but that is not required for this assignment. Alternatively, you can periodically save the current drawing to a file (in a _background thread_, such as through an `ASyncTask!`), which is functionality you'll need to include anyway (see below)! This can help if you find yourself losing your drawings a lot.
 
 - You can also convert a Polyline into a String with the [Maps Utilility Library's](https://developers.google.com/maps/documentation/android-api/utility/) [PolyUtil](http://googlemaps.github.io/android-maps-utils/javadoc/com/google/maps/android/PolyUtil.html) class, if needed (though you'll need to save the color separately). See below for more details about using this library.
+
 
 ### Changing the Pen Color
 In order to make the artwork more visually appealing, you should allow the user to specify the color of the pen. Android provides a [`Color`](http://developer.android.com/intl/zh-tw/reference/android/graphics/Color.html) class similar to Java's that allows color specification in terms of RGB, HSV, hex codes, etc.
@@ -135,44 +138,27 @@ When the user chooses to **save** the drawing (such as by selecting an option fr
 
   - You can test your outputted String by pasting it into [this linter](http://geojsonlint.com/) or [this interactive drawer](http://geojson.io/#map=2/20.0/0.0).
 
-You will then need to write this String to a file saved on [Internal Storage](http://developer.android.com/guide/topics/data/data-storage.html#filesInternal). Internally stored files are private to your application. You can get access to the internal storage directory with `.getFilesDir()`. You can use the method `openFileOutput()` to open a file for editing... **however**, in order effectively share the file, you're going to want to save it in a **subdirectory** (called e.g., `maps/`). You will need to create this directory first if it doesn't exist. Luckily, the [`File`](http://developer.android.com/reference/java/io/File.html) and [`FileOutputStream`](http://developer.android.com/reference/java/io/FileOutputStream.html) classes make this a fairly painless process:
-```java
-//create maps file if doesn't exist
-File mapsDir = new File(this.getFilesDir(), "maps");
-mapsDir.mkdir();  //turn it into a directory
+You will then need to write this String to a file saved _privately_ on [External Storage](http://developer.android.com/guide/topics/data/data-storage.html#filesExternal). This will make the files world-readable so they can be shared later, but will also keep them "hidden" from the user as part of the app!
 
-//create a new file called "drawing.geojson" (overriting previous) and get an output stream for it
-FileOutputStream outputStream = new FileOutputStream(new File(mapsDir, "drawing.geojson"));
+  - You will need to request permission to write to external storage.
 
-outputStream.write(string.getBytes()); //write the string to the file
-outputStream.close(); //close the stream
-```
+  - Remember to check for media availability!
 
-Be sure and save your file with the `.geojson` extension. Technical it should be a `.json` file, but by being more specific you'll be prepared for your application to be able to _open_ these files later if you wanted.
+  - You can get access to a "private" external folder with the <a href="http://developer.android.com/reference/android/content/Context.html#getExternalFilesDir(java.lang.String)">`getExternalFilesDir()`</a> method. You can then create a new `FileOutputStream` object to write to:
+  ```java
+  File file = new File(this.getExternalFilesDir(null), "drawing.geojson");
+  FileOutputStream outputStream = new FileOutputStream(file);
+  outputStream.write(string.getBytes()); //write the string to the file
+  outputStream.close(); //close the stream
+  ```
+
+**Important:** You should save your file with the `.geojson` extension. Technical it should be a `.json` file, but by being more specific you'll be prepared for your application to be able to _open_ these files later if you wanted.
+
 
 #### Sharing the Drawing
 You should enable the user to share your drawing (the file!) through an [Action Provider](http://developer.android.com/training/appbar/action-views.html#action-provider). This is a handy widget that produces a "Share" menu button, that will allow some data to be shared with any app that supports it. See the [reference](http://developer.android.com/reference/android/support/v7/widget/ShareActionProvider.html) for more details (be careful not to mix up the support and non-support versions!)
 
-- You will need to craft an `Intent` to share the drawing through. This should use `ACTION_SEND`, a type of `text/plain`, and should include the file `Uri` as an `EXTRA` (specifically, an `EXTRA_STREAM`), but you'll need o do some work to get access to the internal file!
-
-Files stored in Internal Storage normally are unavailable to other applications. So even if you send the `Uri` along with an Intent, when the other application (e.g., your email program) gets that Intent it won't be able to open the file because it doesn't have access! In order to get around this, you need to set up a [`FileProvider`](http://developer.android.com/training/secure-file-sharing/setup-sharing.html) in order to explicitly offer access to the file. This is a `ContentProvider` (similar to what you used to query the list of SMS messages for the Messaging App), and it will do the work of finding and serving the otherwise private file to external applications.
-
-Setting up a `FileProvider` is luckily not too complex, though it has a couple of steps. You will need to declare the `<provider>` inside you Manifest (see the [guide link](http://developer.android.com/training/secure-file-sharing/setup-sharing.html) for an example). The attributes you will need to specify are:
-- `android:authority` should be your package name followed by `.fileprovider` (e.g., `edu.uw.myapp.fileprovider`). This says what source/domain is granting permission for others to use the file.
-- The child `<meta-data>` tag includes an `androd:resource` attribute that should point to an XML resource, of type `xml` (the same as used for your SharedPreferences). _You will need to create this file!_ The contents of this file will be a list of what _subdirectories_ you want the `FileProvider` to be able to provide. It will look something like:
-```xml
-<?xml version="1.0" encoding="utf-8"?>
-<paths xmlns:android="http://schemas.android.com/apk/res/android">
-    <files-path name="my_maps" path="maps/" />
-</paths>
-```
-The `<files-path>` entry refers to a subdirectory inside the Internal Storage files (the same place that `.getFilesDir()` points to), with the `path` specifying the name of the subdirectory (see why we made one called `maps/`?)
-
-Once you have the provider specified, you can use it to get a `Uri` to the "shared" version of the file using:
-```java
-Uri fileUri = FileProvider.getUriForFile(context, "edu.uw.myapp.fileprovider", fileToShare);
-```
-(note that the second parameter is the "authority" you specified in your `<provider>` in the Manifest). You can then use this `Uri` as the `EXTRA_STREAM` extra in the Intent that you want to share through your `SharedActionProvider` (whew!)
+- You will need to craft an `Intent` to share the drawing through. This should use `ACTION_SEND`, a type of `text/plain`, and should include the file `Uri` as an `EXTRA` (specifically, an `EXTRA_STREAM`).
 
 
 #### Loading a Drawing (extra credit!)
