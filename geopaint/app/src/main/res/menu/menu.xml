@@ -17,9 +17,8 @@
         android:id="@+id/saveFile"
         android:title="SAVE FILE"
         />
-    <item
-        android:id="@+id/shareFile"
+    <item android:id="@+id/action_share"
         android:title="SHARE FILE"
-        />
+        app:actionProviderClass="android.support.v7.widget.ShareActionProvider"/>
 
 </menu>

@@ -1,15 +1,19 @@
 package edu.uw.kartikey.geopaint;
 
 import android.Manifest;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.location.Location;
+import android.net.Uri;
 import android.os.Environment;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.FragmentActivity;
 import android.os.Bundle;
 import android.support.v4.content.ContextCompat;
+import android.support.v4.view.MenuItemCompat;
 import android.support.v7.app.AppCompatActivity;
+import android.support.v7.widget.ShareActionProvider;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -46,7 +50,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
     private GoogleMap mMap;
     Polyline line;
     PolylineOptions polylineOptions;
-
+    Uri globaluri;
 
     GoogleApiClient mGoogleApiClient;
     private static final String TAG = "Location_Activity";
@@ -244,6 +248,24 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
     public boolean onCreateOptionsMenu(Menu menu) {
         MenuInflater inflater = getMenuInflater();
         inflater.inflate(R.menu.menu, menu);
+
+        MenuItem shareItem = menu.findItem(R.id.action_share);
+        ShareActionProvider myShareActionProvider =
+                (ShareActionProvider) MenuItemCompat.getActionProvider(shareItem);
+        Intent myShareIntent = new Intent(Intent.ACTION_SEND);
+        myShareIntent.setType("text/plain");
+        myShareIntent.putExtra(Intent.EXTRA_STREAM,  Uri.fromFile(new File(this.getExternalFilesDir(null), "drawing.geojson")));
+        myShareActionProvider.setShareIntent(myShareIntent);
+
+
+//        Intent myShareIntent = new Intent(Intent.ACTION_SEND);
+//        MenuItem shareItem = menu.findItem(R.id.action_share);
+//        ShareActionProvider myShareActionProvider = (ShareActionProvider) MenuItemCompat.getActionProvider(shareItem);
+//        myShareIntent.setType("text/plain");
+//        myShareIntent.putExtra(Intent.EXTRA_STREAM, Uri.fromFile(new File(this.getExternalFilesDir(null), "drawing.geojson")));
+//        Log.v(TAG, Uri.fromFile(new File(this.getExternalFilesDir(null), "drawing.geojson")).toString());
+//        myShareActionProvider.setShareIntent(myShareIntent);
+
         return true;
     }
 
@@ -259,18 +281,22 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
             case R.id.saveFile:
                 saveFile();
                 return true;
-            case R.id.shareFile:
-                return true;
+//            case R.id.action_share:
+//                shareFile();
+//                return true;
             default:
                 return super.onOptionsItemSelected(item);
         }
     }
 
+
     public void saveFile() {
 
         // Add current line to polylist if pen is still down.
-        if(!penDown)
-            polylist.add(line);
+        if(penDown) {
+            togglePen();
+            togglePen();
+        }
 
 
 
@@ -280,7 +306,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 
         if(isExternalStorageWritable()) {
 
-            File file = new File(this.getExternalFilesDir(null), "picture.geojson");
+            File file = new File(this.getExternalFilesDir(null), "drawing.geojson");
 
             try {
 
@@ -292,17 +318,20 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 
                     Log.v(TAG, geojsonformat);
 
-//                    FileOutputStream os = new FileOutputStream(file);
-//                    os.write(geojsonformat.getBytes());
-//                    os.close();
-//
+
+                    FileOutputStream outputStream = new FileOutputStream(file);
+                    outputStream.write(geojsonformat.getBytes()); //write the string to the file
+                    outputStream.close(); //close the stream
+
                     Toast.makeText(MapsActivity.this, "Picture stored", Toast.LENGTH_SHORT).show();
+
+                    Log.v(TAG,file.toURI().toString());
 
                 } else {
                     Toast.makeText(MapsActivity.this,"No lines to store", Toast.LENGTH_SHORT).show();
                 }
             } catch (Exception e) {
-                Log.w(TAG, "Error writing " + e);
+                Log.w(TAG, "Error " + e);
             }
 
         }
