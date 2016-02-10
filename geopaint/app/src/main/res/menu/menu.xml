@@ -13,5 +13,13 @@
         android:id="@+id/colorPicker"
         android:title="Color Picker"
         />
+    <item
+        android:id="@+id/saveFile"
+        android:title="SAVE FILE"
+        />
+    <item
+        android:id="@+id/shareFile"
+        android:title="SHARE FILE"
+        />
 
 </menu>

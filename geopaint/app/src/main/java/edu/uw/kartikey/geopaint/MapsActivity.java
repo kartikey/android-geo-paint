@@ -4,6 +4,7 @@ import android.Manifest;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.location.Location;
+import android.os.Environment;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.FragmentActivity;
 import android.os.Bundle;
@@ -32,6 +33,9 @@ import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.maps.model.Polyline;
 import com.google.android.gms.maps.model.PolylineOptions;
 
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -83,7 +87,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 
                 globalColor = color;
 
-                if(penDown) {
+                if (penDown) {
                     Location loc = null;
 
                     try {
@@ -96,7 +100,6 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 
                     line = mMap.addPolyline(new PolylineOptions().add(new LatLng(loc.getLatitude(), loc.getLongitude())).color(color));
                 }
-
 
 
             }
@@ -253,9 +256,66 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
             case R.id.colorPicker:
                 showColorPicker();
                 return true;
+            case R.id.saveFile:
+                saveFile();
+                return true;
+            case R.id.shareFile:
+                return true;
             default:
                 return super.onOptionsItemSelected(item);
         }
+    }
+
+    public void saveFile() {
+
+        // Add current line to polylist if pen is still down.
+        if(!penDown)
+            polylist.add(line);
+
+
+
+        for(Polyline i: polylist) {
+            Log.v(TAG, "poly id = "+i.getId());
+        }
+
+        if(isExternalStorageWritable()) {
+
+            File file = new File(this.getExternalFilesDir(null), "picture.geojson");
+
+            try {
+
+                if(polylist != null && polylist.size() > 0) {
+
+                    GeoJsonConverter jsonConverter = new GeoJsonConverter();
+
+                    String geojsonformat = jsonConverter.convertToGeoJson(polylist);
+
+                    Log.v(TAG, geojsonformat);
+
+//                    FileOutputStream os = new FileOutputStream(file);
+//                    os.write(geojsonformat.getBytes());
+//                    os.close();
+//
+                    Toast.makeText(MapsActivity.this, "Picture stored", Toast.LENGTH_SHORT).show();
+
+                } else {
+                    Toast.makeText(MapsActivity.this,"No lines to store", Toast.LENGTH_SHORT).show();
+                }
+            } catch (Exception e) {
+                Log.w(TAG, "Error writing " + e);
+            }
+
+        }
+
+
+    }
+
+    public boolean isExternalStorageWritable() {
+        String state = Environment.getExternalStorageState();
+        if (Environment.MEDIA_MOUNTED.equals(state)) {
+            return true;
+        }
+        return false;
     }
 
     public void showColorPicker() {
