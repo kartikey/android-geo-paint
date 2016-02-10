@@ -27,12 +27,15 @@ import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.UiSettings;
 import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.maps.model.Polyline;
 import com.google.android.gms.maps.model.PolylineOptions;
 
 import java.util.ArrayList;
 import java.util.List;
+
+import petrov.kristiyan.colorpicker.ColorPicker;
 
 public class MapsActivity extends AppCompatActivity implements OnMapReadyCallback,GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener, LocationListener {
 
@@ -45,6 +48,10 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
     private static final String TAG = "Location_Activity";
     private static final int LOC_REQUEST_CODE = 1;
     boolean penDown = false;
+    int globalColor = Color.BLACK;
+    Marker marker  = null;
+    List<Polyline> polylist;
+    ColorPicker colorPicker;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -64,11 +71,36 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
                             .build();
         }
 
+        colorPicker = new ColorPicker(this);
+
+        polylist = new ArrayList<Polyline>();
+
+
+        colorPicker.setOnChooseColorListener(new ColorPicker.OnChooseColorListener() {
+            @Override
+            public void onChooseColor(int position, int color) {
+                Log.v(TAG, color + " Color picked");
+
+                globalColor = color;
+
+                if(penDown) {
+                    Location loc = null;
+
+                    try {
+                        loc = LocationServices.FusedLocationApi.getLastLocation(mGoogleApiClient);
+                    } catch (SecurityException se) {
+
+                    }
+
+                    polylist.add(line);
+
+                    line = mMap.addPolyline(new PolylineOptions().add(new LatLng(loc.getLatitude(), loc.getLongitude())).color(color));
+                }
 
 
 
-
-
+            }
+        });
 
 
 
@@ -88,9 +120,12 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
     public void onMapReady(GoogleMap googleMap) {
         mMap = googleMap;
 
-        // Add a marker in Sydney and move the camera
-        LatLng seattle = new LatLng(47.6550, -122.3080);
-        mMap.addMarker(new MarkerOptions().position(seattle).title("Marker in Sydney"));
+
+
+        LatLng seattle = new LatLng(47.656146,-122.309663);
+
+
+        marker = mMap.addMarker(new MarkerOptions().position(seattle).title("Marker in Seattle"));
         mMap.moveCamera(CameraUpdateFactory.newLatLng(seattle));
 
         googleMap.getUiSettings().setZoomControlsEnabled(true);
@@ -142,6 +177,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         if(permission == PackageManager.PERMISSION_GRANTED){
             //yay! Have permission, do the thing
             LocationServices.FusedLocationApi.requestLocationUpdates(mGoogleApiClient, request, this);
+
         }
         else{
             //if(ActivityCompat.shouldShowRequestPermissionRationale(...))
@@ -184,7 +220,10 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         Log.v(TAG, "longitute = " + location.getLongitude());
 
         LatLng newLatLong = new LatLng(location.getLatitude(), location.getLongitude());
-        mMap.addMarker(new MarkerOptions().position(newLatLong).title("I am here!"));
+        if(marker!=null) {
+            marker.remove();
+        }
+        marker = mMap.addMarker(new MarkerOptions().position(newLatLong).title("I am here!"));
         mMap.moveCamera(CameraUpdateFactory.newLatLng(newLatLong));
 
         if(penDown) {
@@ -212,10 +251,15 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
                 togglePen();
                 return true;
             case R.id.colorPicker:
+                showColorPicker();
                 return true;
             default:
                 return super.onOptionsItemSelected(item);
         }
+    }
+
+    public void showColorPicker() {
+        colorPicker.show();
     }
 
     public void togglePen() {
@@ -230,13 +274,17 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
             }
 
             if(loc != null) {
-                line = mMap.addPolyline(new PolylineOptions().add(new LatLng(loc.getLatitude(),loc.getLongitude()))
-                        .color(Color.BLACK));
+                line = mMap.addPolyline(new PolylineOptions().add(new LatLng(loc.getLatitude(),loc.getLongitude())).color(globalColor));
+                Log.v(TAG,"Started Line at current position");
             }else {
                 line = mMap.addPolyline(new PolylineOptions()
-                        .color(Color.BLACK));
+                        .color(globalColor));
             }
 
+        }
+
+        if(!penDown) {
+            polylist.add(line);
         }
 
         String penText = penDown ? "down" : "up";
